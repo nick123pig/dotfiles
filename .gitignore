@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Except these
+!.gitignore
+!.gitconfig
+!.zshrc
+!ns_settings.terminal
