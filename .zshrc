@@ -24,5 +24,6 @@ alias gr='git rebase origin/master'
 alias gs='git status'
 alias fixup='git commit -a --amend'
 alias gcm='git checkout master'
+alias gp='git pull'
 
 eval "$(rbenv init -)"
