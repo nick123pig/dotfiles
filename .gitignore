@@ -6,6 +6,7 @@
 !.gitconfig
 !.zshrc
 !ns_settings.terminal
+!.tmux.conf
 !.vimrc
 !.vim
 !.vim/colors
