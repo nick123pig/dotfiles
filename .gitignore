@@ -5,8 +5,10 @@
 !.gitignore
 !.gitconfig
 !.zshrc
-!ns_settings.terminal
+!.iterm2_profile
 !.tmux.conf
+!/.tmux
+!/.tmux/**
 !.vimrc
 !.vim
 !.vim/colors
