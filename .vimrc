@@ -371,6 +371,5 @@ endif
 call plug#begin('~/.vim/plugged')
 
 Plug 'ctrlpvim/ctrlp.vim'
-Plug 'artur-shaik/vim-javacomplete2'
 
 call plug#end()
