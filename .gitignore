@@ -11,5 +11,7 @@
 !/.tmux/**
 !.vimrc
 !.vim
+!.vim/bundle
+!.vim/bundle/**
 !.vim/colors
 !.vim/colors/cobalt.vim
