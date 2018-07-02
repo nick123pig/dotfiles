@@ -372,5 +372,6 @@ call plug#begin('~/.vim/plugged')
 
 Plug 'ctrlpvim/ctrlp.vim'
 Plug 'editorconfig/editorconfig-vim'
+Plug 'tpope/vim-surround'
 
 call plug#end()
