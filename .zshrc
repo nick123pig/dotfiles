@@ -34,12 +34,3 @@ source $(brew --prefix nvm)/nvm.sh
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh --no-rehash)"
 source ~/.bash_profile
-
-function up() {
-  i=$1
-  while [ $i -gt 0 ]
-  do
-     cd ..
-     i=$(($i - 1))
-  done
-}
