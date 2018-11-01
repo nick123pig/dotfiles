@@ -6,7 +6,7 @@ setopt HIST_EXPIRE_DUPS_FIRST  # allow dups, but expire old ones when I hit HIST
 setopt EXTENDED_HISTORY        # save timestamp and runtime information
 setopt SHARE_HISTORY
 
-if [[ ! -a ~/.zsh_app_env_vars ]]; then
+if [[ -a ~/.zsh_app_env_vars ]]; then
    source ~/.zsh_app_env_vars
 fi
 
@@ -33,4 +33,8 @@ source $(brew --prefix nvm)/nvm.sh
 
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh --no-rehash)"
-source ~/.bash_profile
+source 
+
+if [[ -a ~/.bash_profile ]]; then
+   source ~/.bash_profile
+fi
