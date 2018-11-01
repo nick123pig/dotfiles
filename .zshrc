@@ -33,7 +33,6 @@ source $(brew --prefix nvm)/nvm.sh
 
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh --no-rehash)"
-source 
 
 if [[ -a ~/.bash_profile ]]; then
    source ~/.bash_profile
