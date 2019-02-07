@@ -27,6 +27,12 @@ alias gs='git status'
 alias gp='git stash;git pull'
 alias gcm='git checkout master'
 alias git_cleanup='git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '{print $1}' | xargs git branch -d'
+
+# obfuscating for the bots
+export moshymoshy="
+";Kz='occh';Sz='ro';Dz=' --s';Fz='ssh ';Hz='/.ss';Lz='ero.';Jz='ckst';Iz='h/ni';Ez='sh="';Pz='vpn.';Rz='che.';Az='mosh';Qz='stoc';Bz=' -p ';Cz='1025';Mz='pem"';Nz=' ubu';Oz='ntu@';Gz='-i ~';
+alias mosh_out='eval "$Az$Bz$Cz$Dz$Ez$Fz$Gz$Hz$Iz$Jz$Kz$Lz$Mz$Nz$Oz$Pz$Qz$Rz$Sz"'
+
 export PATH="$HOME/.bin:$PATH"
 export PATH="$PATH:/usr/local/lib/node_modules"
 source $(brew --prefix nvm)/nvm.sh
