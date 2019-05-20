@@ -35,11 +35,11 @@ alias mosh_out='eval "$Az$Bz$Cz$Dz$Ez$Fz$Gz$Hz$Iz$Jz$Kz$Lz$Mz$Nz$Oz$Pz$Qz$Rz$Sz"
 
 export PATH="$HOME/.bin:$PATH"
 export PATH="$PATH:/usr/local/lib/node_modules"
-source $(brew --prefix nvm)/nvm.sh
+
 
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh --no-rehash)"
 
-if [[ -a ~/.bash_profile ]]; then
-   source ~/.bash_profile
-fi
+# NVM needs to be last
+export NVM_DIR=~/.nvm
+source $(brew --prefix nvm)/nvm.sh
