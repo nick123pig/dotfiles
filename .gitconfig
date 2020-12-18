@@ -3,3 +3,5 @@
 	name = Nick Stocchero
 [push]
 	default = simple
+[pull]
+	rebase = false
