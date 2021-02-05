@@ -6,15 +6,10 @@ setopt HIST_EXPIRE_DUPS_FIRST  # allow dups, but expire old ones when I hit HIST
 setopt EXTENDED_HISTORY        # save timestamp and runtime information
 setopt SHARE_HISTORY
 
-if [[ -a ~/.zsh_app_env_vars ]]; then
-   source ~/.zsh_app_env_vars
-fi
-
-export ZSH=/Users/n/.oh-my-zsh
+export ZSH="/Users/n/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 plugins=(git)
 source $ZSH/oh-my-zsh.sh
-
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
 
@@ -28,18 +23,25 @@ alias gp='git stash;git pull'
 alias gcm='git checkout master'
 alias git_cleanup='git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '{print $1}' | xargs git branch -d'
 
-# obfuscating for the bots
-export moshymoshy="
-";Kz='occh';Sz='ro';Dz=' --s';Fz='ssh ';Hz='/.ss';Lz='ero.';Jz='ckst';Iz='h/ni';Ez='sh="';Pz='vpn.';Rz='che.';Az='mosh';Qz='stoc';Bz=' -p ';Cz='1025';Mz='pem"';Nz=' ubu';Oz='ntu@';Gz='-i ~';
-alias mosh_out='eval "$Az$Bz$Cz$Dz$Ez$Fz$Gz$Hz$Iz$Jz$Kz$Lz$Mz$Nz$Oz$Pz$Qz$Rz$Sz"'
+function gitcleanbranch () {
+    mainbranch=${1:-master}
+    curbranch=$(git rev-parse --abbrev-ref HEAD)
+    dirty=$([[ -z $(git status -s) ]]|| echo 'dirty')
+    if [[ "$curbranch" == "$mainbranch" ]]
+    then
+        echo "Cannot run on $mainbranch"
+        return 1
+    fi
+    if [[ -z "$dirty" ]]
+    then
+        git checkout $curbranch
+        git reset $(git merge-base $mainbranch $curbranch)
+        echo "Branch has been condensed and staged. You'll need to force push your branch"
+        return 0
+    else
+        echo "Branch is dirty. Stash/commit before running again"
+        return 1
+    fi
+}
 
-export PATH="$HOME/.bin:$PATH"
-export PATH="$PATH:/usr/local/lib/node_modules"
-
-
-export PATH="$HOME/.rbenv/bin:$PATH"
-eval "$(rbenv init - zsh --no-rehash)"
-
-# NVM needs to be last
-export NVM_DIR=~/.nvm
-source $(brew --prefix nvm)/nvm.sh
+. /usr/local/opt/asdf/asdf.sh
