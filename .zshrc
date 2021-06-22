@@ -44,4 +44,4 @@ function gitcleanbranch () {
     fi
 }
 
-. /usr/local/opt/asdf/asdf.sh
+. $(brew --prefix asdf)/asdf.sh
