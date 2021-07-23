@@ -13,6 +13,7 @@ source $ZSH/oh-my-zsh.sh
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
 
+alias clearall='printf "\033c"'
 alias ls='ls -G'
 alias gb='git branch'
 alias gbr='git branch -r'
