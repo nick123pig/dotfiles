@@ -8,7 +8,7 @@ setopt SHARE_HISTORY
 
 export ZSH="/Users/n/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
-plugins=(git)
+plugins=(git ssh-agent)
 source $ZSH/oh-my-zsh.sh
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
