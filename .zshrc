@@ -8,10 +8,11 @@ setopt SHARE_HISTORY
 
 export ZSH="/Users/n/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
-plugins=(git ssh-agent)
+plugins=(git ssh-agent gpg-agent)
 source $ZSH/oh-my-zsh.sh
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
+export GPG_TTY=$(tty)
 
 alias clearall='printf "\033c"'
 alias ls='ls -G'
@@ -23,6 +24,7 @@ alias gs='git status'
 alias gp='git stash;git pull'
 alias gcm='git checkout master'
 alias git_cleanup='git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '{print $1}' | xargs git branch -d'
+alias yubikey='gpg-connect-agent "scd serialno" "learn --force" /bye'
 
 function gitcleanbranch () {
     mainbranch=${1:-master}
