@@ -1,9 +1,15 @@
 [user]
 	email = nick123pig@gmail.com
 	name = Nick Stocchero
+	signingkey = 0x2FADEEC405DBCBA7
 [push]
 	default = simple
+	pushSign = if-asked
 [pull]
 	rebase = false
 [init]
 	defaultBranch = main
+[commit]
+	gpgSign = true
+[tag]
+	gpgSign = true
