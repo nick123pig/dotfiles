@@ -7,6 +7,9 @@
 !.zshrc
 !.iterm2_profile
 !.tmux.conf
+!/.gnupg
+!/.gnupg/gpg-agent.conf
+!/.gnupg/*.pub
 !/.tmux
 !/.tmux/**
 !.vimrc
