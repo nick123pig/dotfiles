@@ -6,13 +6,13 @@ setopt HIST_EXPIRE_DUPS_FIRST  # allow dups, but expire old ones when I hit HIST
 setopt EXTENDED_HISTORY        # save timestamp and runtime information
 setopt SHARE_HISTORY
 
-export ZSH="/Users/n/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
-plugins=(git ssh-agent gpg-agent)
-source $ZSH/oh-my-zsh.sh
+if [[ $(uname) == "Darwin" ]]; then
+ (echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> /Users/n/.zprofile
+ eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
-export GPG_TTY=$(tty)
 
 alias clearall='printf "\033c"'
 alias ls='ls -G'
@@ -48,4 +48,3 @@ function gitcleanbranch () {
     fi
 }
 
-. $(brew --prefix asdf)/asdf.sh
