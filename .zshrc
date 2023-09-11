@@ -13,6 +13,7 @@ fi
 
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
+export PS1='%(?.%F{green}√.%F{red}?%?)%f %B%F{240}%1~%f%b %# '
 
 alias clearall='printf "\033c"'
 alias ls='ls -G'
