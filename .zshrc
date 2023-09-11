@@ -27,7 +27,15 @@ alias gcm='git checkout master'
 alias git_cleanup='git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(git branch -vv | grep origin) | awk '{print $1}' | xargs git branch -d'
 alias yubikey_change='gpg-connect-agent "scd serialno" "learn --force" /bye'
 alias yubikey_unlock="gpg-connect-agent \"SCD CHECKPIN $(gpg-connect-agent 'scd serialno' /bye |head -1 |cut -d ' ' -f3)\" /bye"
- 
+
+# ZSH Up/Down History
+autoload -U up-line-or-beginning-search
+autoload -U down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey "^[[A" up-line-or-beginning-search # Up
+bindkey "^[[B" down-line-or-beginning-search # Down
+
 function gitcleanbranch () {
     mainbranch=${1:-master}
     curbranch=$(git rev-parse --abbrev-ref HEAD)
@@ -49,6 +57,7 @@ function gitcleanbranch () {
     fi
 }
 
+
 # START GPG BLOCK
 export GPG_TTY=$TTY
 function _gpg-agent_update-tty_preexec {
@@ -69,4 +78,3 @@ if ! ps -ef | grep "[s]sh-agent" &>/dev/null; then
     echo Starting SSH Agent
     eval $(ssh-agent -s)
 fi
-
