@@ -18,9 +18,13 @@ bindkey "^[[B" down-line-or-beginning-search # Down
 # OS Specific
 if [[ $(uname) == "Darwin" ]]; then
   # Load homebrew
-  (echo; echo 'eval "$(/opt/homebrew/bin/brew shellenv)"') >> /Users/n/.zprofile
   eval "$(/opt/homebrew/bin/brew shellenv)"
+  # Load homebrew completions
+  FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
 fi
+
+# load zsh completions
+autoload -Uz compinit && compinit
 
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
@@ -39,11 +43,6 @@ alias git_cleanup='git branch -r | awk '{print $1}' | egrep -v -f /dev/fd/0 <(gi
 alias yubikey_change='gpg-connect-agent "scd serialno" "learn --force" /bye'
 alias yubikey_unlock="gpg-connect-agent \"SCD CHECKPIN $(gpg-connect-agent 'scd serialno' /bye |head -1 |cut -d ' ' -f3)\" /bye"
 alias gpg_kill='gpgconf --kill gpg-agent'
-
-# Git Autocompletion
-zstyle ':completion:*:*:git:*' script ~/.zsh/git-completion.bash
-fpath=(~/.zsh $fpath)
-autoload -Uz compinit && compinit
 
 # GPG
 export GPG_TTY=$TTY
