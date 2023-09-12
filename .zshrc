@@ -64,4 +64,10 @@ if ! ps -ef | grep "[s]sh-agent" &>/dev/null; then
     eval $(ssh-agent -s)
 fi
 
+# Utilities
 source $HOME/.zsh/util_funcs.sh
+
+# ASDF
+if [[ -f "$HOME/.asdf/asdf.sh" ]]; then
+  . "$HOME/.asdf/asdf.sh"
+fi
