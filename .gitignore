@@ -12,6 +12,8 @@
 !/.gnupg/*.pub
 !/.tmux
 !/.tmux/**
+!/.zsh
+!/.zsh/**
 !.vimrc
 !.vim
 !.vim/bundle
