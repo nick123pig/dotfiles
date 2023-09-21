@@ -28,7 +28,7 @@ autoload -Uz compinit && compinit
 
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
-export PS1='%(?.%F{green}0.%F{red}%?)%f %B%F{240}%1~%f%b $ '
+export PS1='%m %(?.%F{green}0.%F{red}%?)%f %B%F{240}%1~%f%b $ '
 
 alias clearall='printf "\033c"'
 alias ls='ls -G'
