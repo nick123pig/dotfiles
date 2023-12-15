@@ -13,3 +13,5 @@
 	gpgSign = true
 [tag]
 	gpgSign = true
+[rebase]
+        updateRefs = true

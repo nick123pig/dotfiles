@@ -31,29 +31,11 @@ export PS1='%(?.%F{green}0.%F{red}%?)%f %B%F{240}%1~%f%b $ '
 source $HOME/.shell/aliases.sh
 
 # GPG
-export GPG_TTY=$TTY
 function _gpg-agent_update-tty_preexec {
   gpg-connect-agent updatestartuptty /bye &>/dev/null
 }
 autoload -U add-zsh-hook
 add-zsh-hook preexec _gpg-agent_update-tty_preexec
-if [[ $(gpgconf --list-options gpg-agent 2>/dev/null | awk -F: '$1=="enable-ssh-support" {print $10}') = 1 ]]; then
-  unset SSH_AGENT_PID
-  if [[ "${gnupg_SSH_AUTH_SOCK_by:-0}" -ne $$ ]]; then
-    export SSH_AUTH_SOCK="$(gpgconf --list-dirs agent-ssh-socket)"
-  fi
-fi
-
-# SSH
-if ! ps -ef | grep "[s]sh-agent" &>/dev/null; then
-    echo Starting SSH Agent
-    eval $(ssh-agent -s)
-fi
 
 # Utilities
-source $HOME/.shell/util_funcs.sh
-
-# ASDF
-if [[ -f "$HOME/.asdf/asdf.sh" ]]; then
-  . "$HOME/.asdf/asdf.sh"
-fi
+source $HOME/.shell/interactive.sh
