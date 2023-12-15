@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 alias clearall='printf "\033c"'
 alias ls='ls -G'
 alias gb='git branch'
