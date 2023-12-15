@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 function gitcleanbranch () {
     mainbranch=${1:-master}
     curbranch=$(git rev-parse --abbrev-ref HEAD)

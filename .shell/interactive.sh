@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # GPG
 export GPG_TTY=$TTY
 gpg-connect-agent updatestartuptty /bye &>/dev/null
