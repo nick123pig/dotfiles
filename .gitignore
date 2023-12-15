@@ -2,6 +2,8 @@
 *
 
 # Except these
+!.bashrc
+!.bash_profile
 !.gitignore
 !.gitconfig
 !.zshrc
@@ -12,8 +14,8 @@
 !/.gnupg/*.pub
 !/.tmux
 !/.tmux/**
-!/.zsh
-!/.zsh/**
+!/.shell
+!/.shell/**
 !.vimrc
 !.vim
 !.vim/bundle
