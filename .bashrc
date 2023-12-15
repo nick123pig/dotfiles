@@ -9,23 +9,7 @@ fi
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
-export GREP_OPTIONS='--color=auto'
-export GREP_COLOR='100;7'
-export PS1='\h $? \W \\$ '
-
-alias clearall='printf "\033c"'
-alias ls='ls -G'
-alias gb='git branch'
-alias gbr='git branch -r'
-alias gf='git fetch --all --prune'
-alias gr='git rebase origin/master'
-alias gs='git status'
-alias gp='git stash;git pull'
-alias gcm='git checkout master'
-alias yubikey_change='gpg-connect-agent "scd serialno" "learn --force" /bye'
-alias yubikey_unlock="gpg-connect-agent \"SCD CHECKPIN $(gpg-connect-agent 'scd serialno' /bye |head -1 |cut -d ' ' -f3)\" /bye"
-alias gpg_kill='gpgconf --kill gpg-agent'
-
+source $HOME/.shell/aliases.sh
 
 # Eternal bash history.
 # ---------------------
@@ -40,7 +24,3 @@ export HISTFILE=~/.bash_eternal_history
 # Force prompt to write history after every command.
 # http://superuser.com/questions/20900/bash-history-loss
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
-
-
-
-
