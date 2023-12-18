@@ -26,7 +26,7 @@ fi
 # load zsh completions
 autoload -Uz compinit && compinit
 
-export PS1='%(?.%F{green}0.%F{red}%?)%f %B%F{240}%1~%f%b $ '
+export PROMPT='%(?.%F{green}0.%F{red}%?)%f %B%F{240}%1~%f%b $ '
 
 source $HOME/.shell/aliases.sh
 
