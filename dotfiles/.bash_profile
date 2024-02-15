@@ -1,6 +1,7 @@
 source $HOME/.bashrc
 source $HOME/.shell/interactive.sh
 
+
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
@@ -12,3 +13,4 @@ if [[ $(uname) == "Darwin" ]]; then
 else
     source /etc/profile.d/bash_completion.sh
 fi
+

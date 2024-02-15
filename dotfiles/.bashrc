@@ -6,6 +6,9 @@ if [[ $(uname) == "Darwin" ]]; then
   [ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
 fi
 
+bind '"\e[A": history-search-backward'
+bind '"\e[B": history-search-forward'
+
 source $HOME/.shell/aliases.sh
 
 export PS1='[\h] $? \$ '
