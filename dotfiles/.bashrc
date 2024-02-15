@@ -6,6 +6,11 @@ if [[ $(uname) == "Darwin" ]]; then
   [ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
 fi
 
+# Load zoxide
+if [ -x "$(command -v zoxide)" ]; then
+  eval "$(zoxide init bash)"
+fi
+
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
