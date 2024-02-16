@@ -1,5 +1,14 @@
+# GPG Init
+if [ ! -f "$HOME/.gnupg/gpg-agent.conf" ]; then
+    cp $HOME/.gnupg/gpg-agent.conf.default $HOME/.gnupg/gpg-agent.conf
+    if [[ $(uname) == "Darwin" ]]; then
+      echo "pinentry-program /opt/homebrew/bin/pinentry-mac" >> $HOME/.gnupg/gpg-agent.conf
+    else
+      echo "pinentry-program /usr/bin/pinentry-curses" >> $HOME/.gnupg/gpg-agent.conf
+    fi
+fi
+
 # GPG
-export GPG_TTY=$TTY
 gpg-connect-agent updatestartuptty /bye &>/dev/null
 if [[ $(gpgconf --list-options gpg-agent 2>/dev/null | awk -F: '$1=="enable-ssh-support" {print $10}') = 1 ]]; then
   unset SSH_AGENT_PID
