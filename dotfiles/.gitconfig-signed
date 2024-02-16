@@ -1,0 +1,6 @@
+[user]
+	signingkey = 0x2FADEEC405DBCBA7
+[commit]
+	gpgSign = true
+[tag]
+	gpgSign = true

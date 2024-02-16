@@ -10,15 +10,20 @@
 [init]
 	defaultBranch = main
 [rebase]
-        updateRefs = true
-[commit]
-	gpgSign = true
-[tag]
-	gpgSign = true
-[rebase]
-        updateRefs = true
+    updateRefs = true
 [diff "sqlite3"]
 	binary = true
 	textconv = "echo .dump | sqlite3"
 [core]
 	attributesfile = $HOME/.gitattributes
+[rerere]
+	enabled = true
+[branch]
+	sort = -committerdate
+[alias]
+	fpush = "push --force-with-lease"
+
+[includeIf "gitdir:~/projects/signed"]
+    path = ~/.gitconfig-signed
+
+

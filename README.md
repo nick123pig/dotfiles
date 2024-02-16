@@ -1,3 +1,6 @@
-Clone this repo
-Install GNU stow
-`make all`
+* Clone this repo
+
+* Install GNU stow
+
+* `make all`
+
