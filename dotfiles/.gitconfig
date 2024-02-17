@@ -4,6 +4,7 @@
 [push]
 	default = simple
 	pushSign = if-asked
+	autoSetupRemote = true
 [pull]
 	rebase = false
 [init]
