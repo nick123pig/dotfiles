@@ -2,5 +2,5 @@
 
 * Install GNU stow
 
-* `make all`
+* `stow --verbose --target=$HOME --restow dotfiles`
 
