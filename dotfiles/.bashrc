@@ -18,6 +18,10 @@ source $HOME/.shell/aliases.sh
 
 export PS1='[\h] $? \$ '
 
+# GPG
+GPG_TTY=$(tty)
+export GPG_TTY
+
 # external bash history
 export HISTFILESIZE=
 export HISTSIZE=

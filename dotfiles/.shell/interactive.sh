@@ -9,7 +9,6 @@ if [ ! -f "$HOME/.gnupg/gpg-agent.conf" ]; then
 fi
 
 # GPG
-export GPG_TTY=$(tty)
 gpg-connect-agent updatestartuptty /bye &>/dev/null
 if [[ $(gpgconf --list-options gpg-agent 2>/dev/null | awk -F: '$1=="enable-ssh-support" {print $10}') = 1 ]]; then
   unset SSH_AGENT_PID
