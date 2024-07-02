@@ -19,8 +19,10 @@ fi
 
 # SSH
 if ! ps -ef | grep "[s]sh-agent" &>/dev/null; then
-    echo Starting SSH Agent
+  if [ -z "$SSH_AUTH_SOCK" ]; then
+    echo "Starting SSH Agent"
     eval $(ssh-agent -s)
+  fi 
 fi
 
 # Utilities
