@@ -25,5 +25,3 @@
 
 [includeIf "gitdir:~/projects/signed/"]
     path = ~/.gitconfig-signed
-
-

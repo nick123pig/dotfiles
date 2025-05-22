@@ -14,3 +14,7 @@ alias gpg_kill='gpgconf --kill gpg-agent'
 export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='100;7'
 export EDITOR='vim'
+
+if [[ $(uname) == "Darwin" ]]; then
+    alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+fi

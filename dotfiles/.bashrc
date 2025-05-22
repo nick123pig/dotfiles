@@ -6,6 +6,11 @@ if [[ $(uname) == "Darwin" ]]; then
   [ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
 fi
 
+# local bin
+if [ -d "$HOME/.bin" ]; then
+  PATH="$HOME/.bin:$PATH"
+fi
+
 # Load zoxide
 if [ -x "$(command -v zoxide)" ]; then
   eval "$(zoxide init bash)"
@@ -28,3 +33,7 @@ export HISTSIZE=
 export HISTTIMEFORMAT="[%F %T] "
 export HISTFILE=~/.bash_eternal_history
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+
+# Random
+export DO_NOT_TRACK=1
+
