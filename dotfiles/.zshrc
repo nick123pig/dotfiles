@@ -39,3 +39,5 @@ add-zsh-hook preexec _gpg-agent_update-tty_preexec
 
 # Utilities
 source $HOME/.shell/interactive.sh
+
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"

@@ -37,3 +37,5 @@ PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 # Random
 export DO_NOT_TRACK=1
 
+
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"

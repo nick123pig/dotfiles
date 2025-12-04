@@ -12,3 +12,5 @@ if [[ $(uname) == "Darwin" ]]; then
 else
     source /etc/profile.d/bash_completion.sh
 fi
+
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
