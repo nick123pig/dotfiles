@@ -31,6 +31,12 @@
     ],
     // AirPods connect/disconnect toggle.
     //
+    // Turning them OFF needs all THREE actions - block alone is not enough:
+    //   untrust     a trusted device is auto-authorized and reconnects itself
+    //   block       stops NEW connections
+    //   disconnect  block does NOT tear down an EXISTING link, and the AirPods
+    //               reconnect a second or two after a phone handover
+    //
     // Autoconnect is disabled by BLOCKING the device in bluez (it stays
     // paired), so this button unblocks+connects, or disconnects+blocks again.
     // exec reports state every 5s; the click also sends RTMIN+8 so the icon
@@ -42,7 +48,7 @@
         "exec": "bluetoothctl info BC:80:4E:C0:DF:C7 2>/dev/null | grep -q 'Connected: yes' && printf '%s\\n' '{\"text\":\"\\uf025\",\"class\":\"connected\",\"tooltip\":\"AirPods connected \\u2014 click to disconnect\"}' || printf '%s\\n' '{\"text\":\"\\uf025\",\"class\":\"disconnected\",\"tooltip\":\"AirPods blocked \\u2014 click to connect\"}'",
         "interval": 5,
         "signal": 8,
-        "on-click": "if bluetoothctl info BC:80:4E:C0:DF:C7 2>/dev/null | grep -q 'Connected: yes'; then bluetoothctl disconnect BC:80:4E:C0:DF:C7; bluetoothctl block BC:80:4E:C0:DF:C7; else bluetoothctl unblock BC:80:4E:C0:DF:C7 && bluetoothctl connect BC:80:4E:C0:DF:C7; fi; pkill -RTMIN+8 waybar",
+        "on-click": "if bluetoothctl info BC:80:4E:C0:DF:C7 2>/dev/null | grep -q 'Connected: yes'; then bluetoothctl untrust BC:80:4E:C0:DF:C7; bluetoothctl block BC:80:4E:C0:DF:C7; bluetoothctl disconnect BC:80:4E:C0:DF:C7; else bluetoothctl unblock BC:80:4E:C0:DF:C7 && bluetoothctl connect BC:80:4E:C0:DF:C7; fi; pkill -RTMIN+8 waybar",
         "tooltip": true
     },
     // Screenshot button.
