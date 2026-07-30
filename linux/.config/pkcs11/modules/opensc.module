@@ -1,0 +1,2 @@
+module: opensc-pkcs11.so
+disable-in: firefox, code, chrome, chromium, electron, thunderbird, slack, discord

@@ -3,14 +3,18 @@ if [ ! -f "$HOME/.gnupg/gpg-agent.conf" ]; then
     cp $HOME/.gnupg/gpg-agent.conf.default $HOME/.gnupg/gpg-agent.conf
     if [[ $(uname) == "Darwin" ]]; then
       echo "pinentry-program /opt/homebrew/bin/pinentry-mac" >> $HOME/.gnupg/gpg-agent.conf
+    elif [[ -n "$WAYLAND_DISPLAY$DISPLAY" ]] && [[ -x /usr/bin/pinentry-gnome3 ]]; then
+      echo "pinentry-program /usr/bin/pinentry-gnome3" >> $HOME/.gnupg/gpg-agent.conf
     else
       echo "pinentry-program /usr/bin/pinentry-curses" >> $HOME/.gnupg/gpg-agent.conf
     fi
 fi
 
 # GPG
+export GPG_TTY=$(tty)
 gpg-connect-agent updatestartuptty /bye &>/dev/null
-if [[ $(gpgconf --list-options gpg-agent 2>/dev/null | awk -F: '$1=="enable-ssh-support" {print $10}') = 1 ]]; then
+if [[ -z "$SSH_CONNECTION" || -z "$SSH_AUTH_SOCK" ]] \
+  && [[ $(gpgconf --list-options gpg-agent 2>/dev/null | awk -F: '$1=="enable-ssh-support" {print $10}') = 1 ]]; then
   unset SSH_AGENT_PID
   if [[ "${gnupg_SSH_AUTH_SOCK_by:-0}" -ne $$ ]]; then
     export SSH_AUTH_SOCK="$(gpgconf --list-dirs agent-ssh-socket)"

@@ -1,0 +1,8 @@
+linux/.config/dunst*
+linux/.config/mimeapps.list
+linux/.config/sway/config.d/10-outputs.conf
+linux/.config/sway/config.d/80-local-outputs.conf
+linux/.config/systemd/user/airpods-autoblock.service
+linux/.config/systemd/user/default.target.wants/airpods-autoblock.service
+linux/.config/wireplumber/
+linux/.local/share/applications/firefox-*.desktop

@@ -1,5 +1,6 @@
-[user]
-	signingkey = 0x2FADEEC405DBCBA7
+# Put signing key in ~/.gitconfig-local
+#[user]
+# signingkey = 0x...
 [commit]
 	gpgSign = true
 [tag]

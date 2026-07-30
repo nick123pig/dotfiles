@@ -2,5 +2,7 @@
 
 * Install GNU stow
 
-* `stow --verbose --target=$HOME --restow dotfiles`
-
+```sh
+stow --verbose --target=$HOME --restow dotfiles
+stow --verbose --target=$HOME --restow linux  # Linux only
+```
