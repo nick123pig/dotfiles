@@ -1,16 +1,20 @@
-source $HOME/.bashrc
-source $HOME/.shell/interactive.sh
-
-bind '"\e[A": history-search-backward'
-bind '"\e[B": history-search-forward'
-
-# bash autocomplete
+# Login environment; inherited by interactive shells and other child processes.
 if [[ $(uname) == "Darwin" ]]; then
-    if [ -f $(brew --prefix)/etc/bash_completion ]; then
-        . $(brew --prefix)/etc/bash_completion
-    fi
-else
-    source /etc/profile.d/bash_completion.sh
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+if [ -d "$HOME/.bin" ]; then
+  PATH="$HOME/.bin:$PATH"
+fi
+
+if [ -d "$HOME/.local/bin" ]; then
+  PATH="$HOME/.local/bin:$PATH"
 fi
 
 [ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
+
+export PATH="$HOME/.pi/agent/bin:$PATH"
+export DO_NOT_TRACK=1
+
+# Login shells also need the interactive setup in .bashrc.
+[ -r "$HOME/.bashrc" ] && . "$HOME/.bashrc"

@@ -1,0 +1,28 @@
+# Screen sharing for wlroots (sway) via xdg-desktop-portal-wlr.
+#
+# Symptom when this is wrong:
+#     [ERROR] - wlroots: No supported targets specified
+#     [ERROR] - pipewire: fatal error event from core
+#     xdg-desktop-portal-wlr.service: Main process exited, status=1/FAILURE
+# followed by a crash loop, and a black screen in the sharing app.
+#
+# The capture layer itself is fine - `grim` screenshots work, so wlr-screencopy
+# is healthy even on the proprietary NVIDIA driver. The failure is the CHOOSER:
+# portal-wlr asks which output to share, and if the chooser returns nothing it
+# reports "no supported targets" and dies.
+#
+# chooser_type=simple runs slurp, which paints an INVISIBLE crosshair over the
+# screen and waits for a click. After picking a source in Zoom's own dialog,
+# slurp fires second - and it is very easy not to realise the screen is waiting
+# for another click, at which point it returns nothing and the share fails.
+#
+# dmenu + rofi shows an actual list of output names to pick from, which is
+# unmissable. rofi is already installed (it is the Super+d launcher).
+#
+# max_fps caps capture rate - three 4K panels on a Max-Q 3070 that already runs
+# hot, and 30fps is plenty for screen sharing.
+
+[screencast]
+chooser_type=dmenu
+chooser_cmd=rofi -dmenu -i -p "Share which output?"
+max_fps=30

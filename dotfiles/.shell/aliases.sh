@@ -1,3 +1,9 @@
+# Install Kitty's terminfo and shell integration on SSH destinations.
+# Keep ordinary OpenSSH outside Kitty; `command ssh` bypasses this alias.
+if [[ -n "$KITTY_WINDOW_ID" ]] && command -v kitten >/dev/null 2>&1; then
+    alias ssh='kitten ssh'
+fi
+
 alias clearall='printf "\033c"'
 alias ls='ls -G'
 alias gb='git branch'

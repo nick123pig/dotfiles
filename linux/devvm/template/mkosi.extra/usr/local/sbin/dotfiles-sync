@@ -1,0 +1,24 @@
+#!/bin/sh
+# Clone (first boot) or update (every boot) nick123pig/dotfiles into the
+# admin user's home, then deploy them with GNU stow. The repo is public,
+# so no credentials are needed. Failing (e.g. offline at boot) just marks
+# the one-shot failed; the next boot retries, so this never blocks booting.
+set -eu
+
+REPO=/home/admin/dotfiles
+URL=https://github.com/nick123pig/dotfiles
+BRANCH=main
+
+# The dotfiles contain gpg material; keep freshly cloned files private.
+umask 077
+
+if [ ! -d "${REPO}/.git" ]; then
+    git clone --depth 1 --branch "${BRANCH}" "${URL}" "${REPO}"
+else
+    git -C "${REPO}" pull --ff-only origin "${BRANCH}"
+fi
+
+# Deploy the dotfiles and linux packages into the home directory, as the
+# repository README describes. An update is normally a no-op restow.
+cd "${REPO}"
+stow --restow --target="${HOME}" dotfiles linux

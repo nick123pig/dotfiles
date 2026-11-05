@@ -1,0 +1,515 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+"""Create and destroy persistent VMs using mkosi and systemd-vmspawn."""
+
+import argparse
+import fcntl
+import ipaddress
+import os
+from pathlib import Path
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+ROOT = Path(__file__).resolve().parent.parent
+HOME = Path.home()
+RUN_DIR = Path("/var/lib/machines")
+TOOLBOX = "vms-build"
+NAME_RE = re.compile(r"[a-z][a-z0-9-]{0,11}\Z")
+USER_RE = re.compile(r"[a-z_][a-z0-9_-]{0,31}\Z")
+SIZE_RE = re.compile(r"[0-9]+(?:\.[0-9]+)?[KMGTPE]?\Z")
+ID_RE = re.compile(r"[1-9][0-9]{0,2}\Z")
+
+
+class DevvmError(Exception):
+    pass
+
+
+def say(message):
+    print(message, flush=True)
+
+
+def run(*args, check=True, capture=False, input_text=None):
+    return subprocess.run([str(x) for x in args], check=check, text=True,
+                          capture_output=capture, input=input_text)
+
+
+def sudo(*args, **kwargs):
+    return run("sudo", *args, **kwargs)
+
+
+def validate_name(name):
+    if not NAME_RE.fullmatch(name):
+        raise DevvmError(f"invalid name (lowercase, <=12 chars): {name}")
+    return name
+
+
+def read_conf(path):
+    """Read the simple KEY=value format without executing its contents."""
+    result = {}
+    try:
+        lines = path.read_text().splitlines()
+    except FileNotFoundError:
+        raise DevvmError(f"missing {path}") from None
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        if not sep or not re.fullmatch(r"[A-Z_]+", key) or key in result:
+            raise DevvmError(f"invalid or duplicate entry in {path}: {line}")
+        result[key] = value
+    return result
+
+
+def allocate_id():
+    used = set()
+    for directory in sorted((ROOT / "target").glob("*")):
+        if not directory.is_dir() or directory.name.startswith("."):
+            continue
+        conf = read_conf(directory / "VM.conf")
+        value = conf.get("ID", "")
+        if not ID_RE.fullmatch(value) or int(value) > 255:
+            raise DevvmError(f"invalid or missing ID in {directory / 'VM.conf'}: {value}")
+        number = int(value)
+        if number in used:
+            raise DevvmError(f"duplicate VM ID: {number}")
+        used.add(number)
+    for number in range(1, 256):
+        if number not in used:
+            return number
+    raise DevvmError("no free VM subnets (IDs 1–255 are in use)")
+
+
+def load_conf(name):
+    validate_name(name)
+    conf = read_conf(ROOT / "target" / name / "VM.conf")
+    for key in ("ID", "HOST_IP", "VM_IP", "RAM", "CPUS", "USER"):
+        if key not in conf:
+            raise DevvmError(f"missing {key} in VM {name}")
+    if not ID_RE.fullmatch(conf["ID"]) or int(conf["ID"]) > 255:
+        raise DevvmError(f"invalid ID in VM {name}")
+    if conf.get("NAME", name) != name:
+        raise DevvmError(f"name mismatch in VM {name}")
+    number = int(conf["ID"])
+    if conf["HOST_IP"] != f"10.254.{number}.1" or conf["VM_IP"] != f"10.254.{number}.2":
+        raise DevvmError(f"invalid network addresses in VM {name}")
+    validate_options(conf["USER"], conf["RAM"], conf["CPUS"], "150G")
+    if conf.get("GHOSTTY_TERMINFO", "fallback") not in ("installed", "fallback"):
+        raise DevvmError(f"invalid GHOSTTY_TERMINFO in VM {name}")
+    return conf
+
+
+def validate_options(user, ram, cpus, disk):
+    if not USER_RE.fullmatch(user):
+        raise DevvmError(f"invalid user name: {user}")
+    if not re.fullmatch(r"[1-9][0-9]*", cpus):
+        raise DevvmError(f"invalid CPU count: {cpus}")
+    for name, value in (("RAM", ram), ("disk", disk)):
+        if not SIZE_RE.fullmatch(value):
+            raise DevvmError(f"invalid {name} size: {value}")
+
+
+def ensure_ssh_include():
+    ssh = HOME / ".ssh"
+    (ssh / "config.d").mkdir(parents=True, mode=0o700, exist_ok=True)
+    ssh.chmod(0o700)
+    cfg = ssh / "config"
+    include = "Include ~/.ssh/config.d/*\n"
+    if not cfg.exists():
+        cfg.write_text(include)
+        cfg.chmod(0o600)
+    else:
+        old = cfg.read_text()
+        if not re.search(r"^\s*Include\s+[^\n#]*\.ssh/config\.d", old, re.MULTILINE):
+            shutil.copy2(cfg, ssh / "config.vms.bak")
+            tmp = ssh / "config.tmp"
+            tmp.write_text(include + "\n" + old)
+            tmp.chmod(0o600)
+            tmp.replace(cfg)
+            say(f"added SSH Include (backup: {ssh / 'config.vms.bak'})")
+
+
+def regenerate_ssh_config():
+    target = HOME / ".ssh/config.d/50-vms.conf"
+    target.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+    blocks = []
+    for directory in sorted((ROOT / "target").glob("*")):
+        if directory.name.startswith(".") or not (directory / "VM.conf").is_file():
+            continue
+        conf = load_conf(directory.name)
+        block = (f"Host {directory.name}\n    HostName {conf['VM_IP']}\n"
+                 f"    User {conf['USER']}\n    StrictHostKeyChecking accept-new\n"
+                 "    ForwardAgent yes\n"
+                 "    ServerAliveInterval 10\n\n")
+        if conf.get("GHOSTTY_TERMINFO") != "installed":
+            block += (f'Match originalhost {directory.name} exec "test \\\"${{TERM:-}}\\\" = xterm-ghostty"\n'
+                      "    SetEnv TERM=xterm-256color\n\n")
+        blocks.append(block)
+    # Avoid leaving a partially-written SSH config on error.
+    temp = target.with_name(target.name + ".tmp")
+    fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        stream.write("".join(blocks))
+    temp.chmod(0o600)
+    temp.replace(target)
+
+
+def output_or_empty(*args):
+    try:
+        result = run(*args, check=False, capture=True)
+    except FileNotFoundError:
+        return ""
+    return result.stdout if result.returncode == 0 else ""
+
+
+def find_dns():
+    for word in output_or_empty("resolvectl", "dns").split():
+        try:
+            address = ipaddress.ip_address(word)
+        except ValueError:
+            continue
+        if address.version == 4 and not address.is_loopback:
+            return str(address)
+    for line in output_or_empty("ip", "route").splitlines():
+        fields = line.split()
+        if fields and fields[0] == "default" and "via" in fields:
+            return fields[fields.index("via") + 1]
+    return "10.0.2.1"
+
+
+def stage_ghostty_terminfo(extra):
+    """Capture the host's entry for tic to compile during the image build."""
+    source = output_or_empty("infocmp", "-x", "xterm-ghostty")
+    if not source.strip():
+        say("host xterm-ghostty terminfo not found; SSH will use xterm-256color")
+        return "fallback"
+    destination = extra / "usr/lib/devvm/xterm-ghostty.terminfo"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(source)
+    return "installed"
+
+
+def replace_in_file(path, replacements):
+    text = path.read_text()
+    for old, new in replacements:
+        text = text.replace(old, new)
+    path.write_text(text)
+
+
+def create_vm(name, ram, cpus, disk, user):
+    validate_name(name)
+    validate_options(user, ram, cpus, disk)
+    directory = ROOT / "target" / name
+    if directory.exists():
+        raise DevvmError(f"VM {name} already exists")
+    number = allocate_id()
+    host_ip, vm_ip = f"10.254.{number}.1", f"10.254.{number}.2"
+    shutil.copytree(ROOT / "template", directory, symlinks=True, copy_function=shutil.copy2)
+    (directory / "secrets").mkdir()
+    replace_in_file(directory / "mkosi.repart/20-root.conf", [
+        ("SizeMinBytes=150G", f"SizeMinBytes={disk}"),
+        ("SizeMaxBytes=150G", f"SizeMaxBytes={disk}"),
+    ])
+    extra = directory / "mkosi.extra"
+    if user != "admin":
+        files = list((extra / "usr/lib/sysusers.d").glob("*.conf"))
+        files += list((extra / "usr/lib/tmpfiles.d").glob("*.conf"))
+        files += [extra / "etc/subuid", extra / "etc/subgid"]
+        for path in files:
+            path.write_text(re.sub(r"\badmin\b", lambda _: user, path.read_text()))
+        (extra / "home/admin").rename(extra / "home" / user)
+        linger = extra / "var/lib/systemd/linger/admin"
+        if linger.exists():
+            linger.rename(linger.with_name(user))
+    key = directory / "secrets/ssh_host_ed25519_key"
+    run("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key, "-C", f"vms-{name}")
+    for suffix in ("", ".pub"):
+        shutil.copy2(str(key) + suffix, extra / "etc/ssh" / (key.name + suffix))
+    replace_in_file(extra / "etc/systemd/network/10-eth0.network", [
+        ("@IP@", vm_ip), ("@GW@", host_ip), ("@DNS@", find_dns()),
+    ])
+    (extra / "etc/hostname").write_text(name + "\n")
+    terminfo = stage_ghostty_terminfo(extra)
+    conf = {"NAME": name, "ID": str(number), "HOST_IP": host_ip, "VM_IP": vm_ip,
+            "RAM": ram, "CPUS": cpus, "USER": user, "GHOSTTY_TERMINFO": terminfo}
+    (directory / "VM.conf").write_text("".join(f"{k}={v}\n" for k, v in conf.items()))
+    ensure_ssh_include()
+    regenerate_ssh_config()
+    say(f"created VM {name}: host={host_ip} vm={vm_ip} (tap vt-{name})")
+    return conf
+
+
+# Runs inside systemd-dissect's temporary mount, using the host's Python/tools.
+IMAGE_CHECK = r'''import os, pathlib, subprocess, sys
+root = pathlib.Path(os.environ["SYSTEMD_DISSECT_ROOT"])
+user = sys.argv[1]
+terminfo = sys.argv[2]
+contexts = root / "etc/selinux/targeted/contexts/files/file_contexts"
+if not contexts.is_file():
+    sys.exit("Missing guest SELinux file contexts")
+subprocess.run(["setfiles", "-F", "-r", str(root), str(contexts), str(root)], check=True)
+label = subprocess.check_output(["stat", "-c", "%C", str(root)], text=True).strip()
+if label != "system_u:object_r:root_t:s0":
+    sys.exit(f"Unexpected guest root SELinux label: {label}")
+mask = root / "etc/systemd/system/systemd-firstboot.service"
+if not mask.is_symlink() or os.readlink(mask) != "/dev/null":
+    sys.exit("Guest first-boot prompt is not masked")
+for unit in ("sshd.service", "systemd-networkd.service", "systemd-resolved.service", "dbus.socket"):
+    if subprocess.run(["systemctl", f"--root={root}", "--quiet", "is-enabled", unit]).returncode:
+        sys.exit(f"Guest unit not enabled: {unit}")
+keys = root / "home" / user / ".ssh/authorized_keys"
+if not keys.is_file() or not keys.stat().st_size:
+    sys.exit("Guest authorized_keys is missing or empty")
+if not (root / "usr/lib64/security/pam_systemd.so").exists():
+    sys.exit("Guest systemd PAM module is missing")
+if terminfo == "installed" and not any((root / "etc/terminfo" / prefix / "xterm-ghostty").is_file() for prefix in ("x", "78")):
+    sys.exit("Guest Ghostty terminfo entry is missing")
+'''
+
+
+def prepare_runtime_image(image, user, terminfo):
+    if not shutil.which("setfiles"):
+        raise DevvmError("setfiles is required on the host (install policycoreutils)")
+    sudo("systemd-dissect", "--with", image, "python3", "-c", IMAGE_CHECK, user, terminfo)
+
+
+def is_running(name):
+    result = run("systemctl", "is-active", "--quiet", f"systemd-vmspawn@{name}",
+                 check=False, capture=True)
+    if result.returncode == 0:
+        return True
+    if result.returncode in (3, 4):  # inactive/failed or unknown unit
+        return False
+    raise DevvmError(f"could not determine whether {name} is running: {result.stderr.strip()}")
+
+
+def wait_for_ssh(name, ip):
+    for _ in range(90):
+        try:
+            with socket.create_connection((ip, 22), timeout=2):
+                return
+        except OSError:
+            pass
+        if not is_running(name):
+            raise DevvmError(f"{name} stopped before SSH became ready; inspect: sudo journalctl -u systemd-vmspawn@{name} -e")
+        time.sleep(2)
+    raise DevvmError(f"{name} started but SSH did not become reachable; inspect: sudo journalctl -u systemd-vmspawn@{name} -e")
+
+
+def deploy_host_conf(name, conf):
+    directory = ROOT / "target" / name
+    runtime = RUN_DIR / name
+    dropin = f"/etc/systemd/system/systemd-vmspawn@{name}.service.d"
+    sudo("rm", "-rf", f"/etc/systemd/system/devvm@{name}.service.d")
+    sudo("mkdir", "-p", dropin)
+    service = (f"[Service]\nEnvironment=VMS_SYSTEM={runtime}/system.raw\n"
+               f"Environment=VMS_KERNEL={runtime}/system.vmlinuz\n"
+               f"Environment=VMS_INITRD={runtime}/system.initrd\n"
+               f"Environment=VMS_RAM={conf['RAM']}\nEnvironment=VMS_CPUS={conf['CPUS']}\n"
+               "ExecStart=\n"
+               f"ExecStart=/usr/bin/systemd-vmspawn -M {name} --image=${{VMS_SYSTEM}} "
+               "--linux=${VMS_KERNEL} --initrd=${VMS_INITRD} --cpus=${VMS_CPUS} "
+               "--ram=${VMS_RAM} --network-tap --register=yes --keep-unit "
+               "--notify-ready=no net.ifnames=0\n")
+    sudo("tee", f"{dropin}/10-vm.conf", input_text=service, capture=True)
+    sudo("rm", "-f", f"{dropin}/10-runtime.conf")
+    sudo("systemctl", "daemon-reload")
+    (directory / f"91-devvm-{name}.network").unlink(missing_ok=True)
+    sudo("rm", "-f", f"/etc/systemd/network/91-devvm-{name}.network")
+    network = directory / f"10-devvm-{name}.network"
+    network.write_text(f"[Match]\nName=vt-{name}\n\n[Network]\nAddress={conf['HOST_IP']}/30\nIPMasquerade=both\nIPv4Forwarding=yes\n")
+    sudo("install", "-m644", network, f"/etc/systemd/network/10-devvm-{name}.network")
+    sudo("networkctl", "reload")
+    if run("ip", "link", "show", "dev", f"vt-{name}", check=False, capture=True).returncode == 0:
+        sudo("networkctl", "reconfigure", f"vt-{name}")
+
+
+def build_vm(name, conf):
+    directory = ROOT / "target" / name
+    runtime = RUN_DIR / name
+    exists = sudo("test", "-e", runtime / "system.raw", check=False).returncode
+    if exists == 0:
+        raise DevvmError(f"a disk already exists for {name}; refusing to clobber in-VM state")
+    if exists != 1:
+        raise DevvmError(f"could not check the runtime disk for {name}")
+    if shutil.which("mkosi"):
+        run("mkosi", "-C", directory, "--force", "--incremental=no", "--cache-only=never", "build")
+    else:
+        run("toolbox", "run", "--container", TOOLBOX, "--", "mkosi", "-C", directory,
+            "--force", "--incremental=no", "--cache-only=never", "build")
+    sudo("mkdir", "-p", runtime)
+    sudo("cp", "--reflink=never", "--sparse=always", directory / "out/system.raw", runtime / "system.raw")
+    for artifact in ("system.vmlinuz", "system.initrd"):
+        sudo("cp", directory / "out" / artifact, runtime / artifact)
+    say("labeling and checking the staged image…")
+    prepare_runtime_image(runtime / "system.raw", conf["USER"], conf.get("GHOSTTY_TERMINFO", "fallback"))
+    deploy_host_conf(name, conf)
+
+
+def format_bytes(value):
+    try:
+        number = int(value)
+        if number < 0 or number >= 2**64 - 1:
+            return "-"
+    except (TypeError, ValueError):
+        return "-"
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB", "PiB"):
+        if number < 1024 or unit == "PiB":
+            return f"{number:.1f}{unit}" if unit != "B" else f"{number}B"
+        number /= 1024
+
+
+def cmd_list():
+    rows = []
+    for directory in sorted((ROOT / "target").glob("*")):
+        if not directory.is_dir() or directory.name.startswith("."):
+            continue
+        name = directory.name
+        try:
+            conf = load_conf(name)
+        except DevvmError:
+            rows.append((name, "incomplete", "-", "-", "-", "-"))
+            continue
+        result = run("systemctl", "show", f"systemd-vmspawn@{name}",
+                     "--property=ActiveState,MemoryCurrent,CPUUsageNSec",
+                     check=False, capture=True)
+        properties = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        state = properties.get("ActiveState", "unknown") if result.returncode == 0 else "unknown"
+        memory = format_bytes(properties.get("MemoryCurrent")) if state == "active" else "-"
+        cpu = "-"
+        if state == "active":
+            try:
+                ns = int(properties.get("CPUUsageNSec", ""))
+                if 0 <= ns < 2**64 - 1:
+                    cpu = f"{ns / 1e9:.1f}s"
+            except ValueError:
+                pass
+        rows.append((name, state, conf["CPUS"], conf["RAM"], memory, cpu))
+    headers = ("NAME", "STATE", "VCPUS", "RAM", "MEMORY", "CPU TIME")
+    widths = [max(len(str(row[i])) for row in [headers, *rows]) for i in range(len(headers))]
+    for row in [headers, *rows]:
+        print("  ".join(str(value).ljust(widths[i]) for i, value in enumerate(row)).rstrip())
+
+
+def cmd_new(args):
+    conf = create_vm(args.name, args.ram, args.cpus, args.disk, args.user)
+    build_vm(args.name, conf)
+    say(f"starting {args.name}…")
+    sudo("systemctl", "start", f"systemd-vmspawn@{args.name}")
+    say(f"waiting for SSH on {conf['VM_IP']}…")
+    wait_for_ssh(args.name, conf["VM_IP"])
+    shutil.rmtree(ROOT / "target" / args.name / "out")
+    say(f"{args.name} is accepting SSH connections. login: ssh {args.name}")
+
+
+def cmd_destroy(args):
+    name = validate_name(args.name)
+    directory = ROOT / "target" / name
+    conf = load_conf(name)
+    if not args.yes:
+        say(f"Permanently delete {name}, its disk, VM files, host config and SSH alias?")
+        if not input("proceed? [y/N] ").lower().startswith("y"):
+            say("aborted")
+            return
+        if input(f"type the VM name to confirm ('{name}'): ") != name:
+            say("aborted (name mismatch)")
+            return
+    if is_running(name):
+        sudo("systemctl", "stop", f"systemd-vmspawn@{name}")
+    sudo("systemctl", "reset-failed", f"systemd-vmspawn@{name}", check=False, capture=True)
+    for _ in range(30):
+        if not is_running(name):
+            break
+        time.sleep(1)
+    if is_running(name):
+        raise DevvmError(f"{name} is still running; refusing to remove its disk")
+    sudo("rm", "-rf", RUN_DIR / name)
+    for prefix in ("10", "91"):
+        sudo("rm", "-f", f"/etc/systemd/network/{prefix}-devvm-{name}.network")
+    for unit in (f"systemd-vmspawn@{name}", f"devvm@{name}"):
+        sudo("rm", "-rf", f"/etc/systemd/system/{unit}.service.d")
+    sudo("systemctl", "daemon-reload")
+    shutil.rmtree(directory)
+    regenerate_ssh_config()
+    for host in (name, conf["VM_IP"]):
+        run("ssh-keygen", "-R", host, check=False, capture=True)
+    say(f"destroyed {name}.")
+
+
+def check_host_prerequisites():
+    if not shutil.which("systemd-vmspawn"):
+        raise DevvmError("systemd-vmspawn not found; install host dependencies (see README.txt)")
+    if not Path("/usr/lib/systemd/system/systemd-vmspawn@.service").exists():
+        raise DevvmError("systemd-vmspawn@.service not found (host systemd too old?)")
+    result = run("systemctl", "is-active", "--quiet", "systemd-networkd", check=False, capture=True)
+    if result.returncode:
+        raise DevvmError("systemd-networkd is not active or its status could not be checked; "
+                         "check systemctl status systemd-networkd and see README.txt for setup")
+    if not shutil.which("mkosi"):
+        if not shutil.which("toolbox") or run("toolbox", "run", "--container", TOOLBOX, "--",
+                                               "mkosi", "--version", check=False, capture=True).returncode:
+            raise DevvmError(f"mkosi not found on host or in toolbox {TOOLBOX}; see README.txt for setup")
+
+
+def parser():
+    p = argparse.ArgumentParser(description=__doc__)
+    sub = p.add_subparsers(dest="command", required=True)
+    sub.add_parser("list", help="list VMs and host resource usage")
+    new = sub.add_parser("new", help="create, build and start a VM")
+    new.add_argument("name", type=validate_arg_name)
+    new.add_argument("--ram", default=os.environ.get("DEVVM_RAM", "8G"))
+    new.add_argument("--cpus", default=os.environ.get("DEVVM_CPUS", "2"))
+    new.add_argument("--disk", default=os.environ.get("DEVVM_DISK", "150G"))
+    new.add_argument("--user", default=os.environ.get("DEVVM_ADMIN", "admin"))
+    destroy = sub.add_parser("destroy", help="permanently delete a VM and its data")
+    destroy.add_argument("name", type=validate_arg_name)
+    destroy.add_argument("--yes", action="store_true")
+    sub.add_parser("help", help="show this help")
+    return p
+
+
+def validate_arg_name(name):
+    try:
+        return validate_name(name)
+    except DevvmError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def main(argv=None):
+    p = parser()
+    args = p.parse_args(argv)
+    if args.command == "help":
+        p.print_help()
+        return
+    if args.command == "list":
+        cmd_list()
+        return
+    if args.command == "new":
+        validate_options(args.user, args.ram, args.cpus, args.disk)
+        check_host_prerequisites()
+    sudo("-v")
+    ROOT.mkdir(parents=True, exist_ok=True)
+    with (ROOT / ".devvm.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        (ROOT / "target").mkdir(parents=True, exist_ok=True)
+        if args.command == "new":
+            cmd_new(args)
+        else:
+            cmd_destroy(args)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (DevvmError, OSError, subprocess.CalledProcessError) as exc:
+        print(f"devvm: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\ndevvm: interrupted", file=sys.stderr)
+        sys.exit(130)

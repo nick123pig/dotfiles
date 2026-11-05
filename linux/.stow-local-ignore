@@ -1,0 +1,3 @@
+# devvm is its own tool; don't symlink it into $HOME (no ~/devvm).
+# It's reachable via ~/.local/bin/devvm instead.
+/devvm

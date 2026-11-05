@@ -97,6 +97,8 @@ button:hover {
    unstyled. */
 #custom-screenshot,
 #custom-airpods,
+#custom-tailscale,
+#custom-bluelight,
 #mpd {
     padding: 0 10px;
     color: #ffffff;
@@ -112,9 +114,57 @@ button:hover {
     color: #2a5c45;
 }
 
+/* Connected to bluez but the audio sink has not appeared yet - see
+   ~/.local/bin/airpods. Amber rather than green precisely because the old
+   button's bug was going green here: during this window audio is still coming
+   out of the laptop speakers, and the bar should say so. */
+#custom-airpods.pending {
+    background-color: #e6b800;
+    color: #4a3800;
+}
+
 #custom-airpods.disconnected {
     background-color: #90b1b1;
     color: #2a5c45;
+}
+
+/* Blue light filter. Warm amber while active, so the button reads as "screen
+   is being warmed" at a glance; neutral grey while off. Same light-background
+   /dark-text treatment as #custom-airpods, for the reason documented there -
+   a dimmed foreground alone disappears against the translucent bar. */
+#custom-bluelight.on {
+    background-color: #f0932b;
+    color: #2a2a2a;
+}
+
+#custom-bluelight.off {
+    background-color: #90b1b1;
+    color: #2a5c45;
+}
+
+/* Tailscale: distinct colour per tailnet so home vs work is obvious at a
+   glance without reading the label. */
+#custom-tailscale.home {
+    background-color: #64727D;
+    color: #ffffff;
+}
+
+#custom-tailscale.work {
+    background-color: #ffa000;
+    color: #2a2a2a;
+}
+
+#custom-tailscale.unknown {
+    background-color: #f53c3c;
+    color: #ffffff;
+}
+
+/* Shown the instant the button is clicked, before the switch runs, so the
+   press is visibly acknowledged. Cleared ~2s later when the new tailnet has
+   settled. */
+#custom-tailscale.switching {
+    background-color: #f53c3c;
+    color: #ffffff;
 }
 
 #window,

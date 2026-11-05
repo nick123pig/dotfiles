@@ -1,0 +1,13 @@
+# Static guest networking: eth0 on the host's vt-<name> tap.
+# @IP@/@GW@/@DNS@ are filled in by `devvm create` (sed).
+# net.ifnames=0 is appended to the kernel cmdline by devvm@.service.
+[Match]
+Name=eth0
+
+[Network]
+Address=@IP@/30
+Gateway=@GW@
+DNS=@DNS@
+
+[Link]
+RequiredForOnline=no

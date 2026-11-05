@@ -1,0 +1,16 @@
+[Unit]
+Description=Synchronize nick123pig/dotfiles into the admin home directory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=admin
+Group=admin
+WorkingDirectory=/home/admin
+Environment=HOME=/home/admin
+ExecStart=/usr/local/sbin/dotfiles-sync
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

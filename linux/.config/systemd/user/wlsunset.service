@@ -1,0 +1,34 @@
+[Unit]
+Description=Blue light filter (wlsunset)
+Documentation=man:wlsunset(1)
+
+# Tie the daemon's lifetime to the graphical session so it goes away with sway
+# rather than lingering as a stray process against a dead compositor.
+PartOf=graphical-session.target
+After=sway-session.target
+
+[Service]
+Type=simple
+
+# THE schedule. Deliberately here and nowhere else: sway's config.d entry and
+# waybar's toggle button both drive this unit by name, so neither carries a
+# copy of these flags that could drift out of sync.
+#   -S/-s  sunrise/sunset as fixed clock times (no coordinates - this repo is
+#          public; see 45-bluelight.conf)
+#   -t/-T  night/day colour temperature in kelvin
+ExecStart=/usr/bin/wlsunset -S 07:00 -s 20:00 -t 3500 -T 6500
+
+# The reason this is a unit instead of a bare background process. wlsunset
+# exits when its wlr-gamma-control object is torn down, which happens when
+# outputs come and go - DPMS, suspend/resume, docking. Started by hand it
+# simply dies overnight and the screen is cold in the morning with nothing
+# logged to say why.
+Restart=always
+RestartSec=2
+
+# Explicit `systemctl --user stop` (what the waybar button does) is NOT a
+# failure, so Restart=always correctly leaves it stopped - the toggle still
+# toggles.
+
+[Install]
+WantedBy=sway-session.target

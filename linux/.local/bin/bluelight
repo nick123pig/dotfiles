@@ -1,0 +1,60 @@
+#!/bin/sh
+# Blue light filter control, shared by sway (startup) and waybar (toggle button).
+#
+# This drives the wlsunset.service systemd user unit rather than running
+# wlsunset directly. Two reasons:
+#
+#   1. wlsunset exits when its wlr-gamma-control object is destroyed - outputs
+#      going through DPMS, suspend/resume, docking. Run as a bare background
+#      process it dies silently overnight; the unit's Restart=always brings it
+#      back.
+#   2. stderr lands in the journal (`journalctl --user -u wlsunset`) instead of
+#      /dev/null, so the next silent death is actually diagnosable.
+#
+# The schedule itself lives in the unit's ExecStart, so it is defined exactly
+# once even though sway, waybar and this script all touch it.
+UNIT=wlsunset.service
+
+# Must match "signal" on custom/bluelight in the waybar config. 8 is AirPods,
+# 9 is tailscale.
+SIGNAL=10
+
+running() { systemctl --user is-active --quiet "$UNIT"; }
+
+# Stopping the unit is enough to undo the tint: under wlr-gamma-control the
+# compositor restores the original gamma ramp when the client disconnects, so
+# there is nothing to reset by hand.
+case "${1:-toggle}" in
+    start)
+        systemctl --user start "$UNIT"
+        ;;
+    stop)
+        systemctl --user stop "$UNIT"
+        ;;
+    toggle)
+        if running; then
+            systemctl --user stop "$UNIT"
+        else
+            systemctl --user start "$UNIT"
+        fi
+        # Repaint immediately rather than waiting out the poll interval.
+        pkill -RTMIN+$SIGNAL waybar >/dev/null 2>&1
+        ;;
+    status)
+        # Icons are JSON \u escapes, not literal glyphs: U+F185 / U+F186 are
+        # Private Use Area (Font Awesome 6 Free Solid) and can be silently
+        # mangled in transit, leaving an invisible module. waybar decodes the
+        # escape when it parses this JSON.
+        if running; then
+            printf '%s\n' '{"text":"\uf186","class":"on","tooltip":"Blue light filter ON — click to disable"}'
+        else
+            printf '%s\n' '{"text":"\uf185","class":"off","tooltip":"Blue light filter OFF — click to enable"}'
+        fi
+        ;;
+    *)
+        echo "usage: ${0##*/} [start|stop|toggle|status]" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

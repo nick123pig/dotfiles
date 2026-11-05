@@ -1,0 +1,3 @@
+# Dev VM: the admin user (in group wheel) gets passwordless sudo.
+# Key-only ssh login, no passwords anywhere (see sshd_config.d/50-vms.conf).
+%wheel ALL=(ALL) NOPASSWD: ALL

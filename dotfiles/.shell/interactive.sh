@@ -32,6 +32,29 @@ fi
 # Utilities
 source $HOME/.shell/util_funcs.sh
 
+histoff() {
+  if [[ -n "$_HIST_PAUSED" ]]; then
+    echo "history is already off — 'histon' to resume" >&2
+    return 0
+  fi
+  set +o history
+  _HIST_PAUSED=1
+  _HIST_SAVED_PS1="$PS1"
+  PS1="(nohist) $PS1"
+  echo "bash history OFF — 'histon' to resume" >&2
+}
+
+histon() {
+  if [[ -z "$_HIST_PAUSED" ]]; then
+    echo "history is already on" >&2
+    return 0
+  fi
+  set -o history
+  PS1="$_HIST_SAVED_PS1"
+  unset _HIST_PAUSED _HIST_SAVED_PS1
+  echo "bash history ON" >&2
+}
+
 # ASDF
 if [[ -f "$HOME/.asdf/asdf.sh" ]]; then
   . "$HOME/.asdf/asdf.sh"

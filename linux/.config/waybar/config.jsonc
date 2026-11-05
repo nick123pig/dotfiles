@@ -11,11 +11,14 @@
         "sway/mode",
         "sway/scratchpad"
     ],
-    "modules-center": [
-        "sway/window"
-    ],
+    // Deliberately empty: "sway/window" (focused window title) was removed -
+    // sway already shows the title in the window's own titlebar, and a long
+    // title crowded the right-hand widgets.
+    "modules-center": [],
     "modules-right": [
+        "custom/tailscale",
         "custom/airpods",
+        "custom/bluelight",
         "custom/screenshot",
         "idle_inhibitor",
         "pulseaudio",
@@ -29,26 +32,89 @@
         "clock",
         "tray"
     ],
+    // Tailscale tailnet indicator + switcher.
+    //
+    // Shows which account is active (home / rudder) and clicking switches to
+    // the other one. The active profile is the row ending in '*' in
+    // `tailscale switch --list`.
+    //
+    // REQUIRES the operator grant, PER PROFILE:
+    //     sudo tailscale set --operator=$USER
+    // OperatorUser is a per-profile pref, not global - setting it on one
+    // tailnet does NOT carry to the other, and without it `switch --list`
+    // returns 'Access denied: profiles access denied' and this module goes
+    // blank. Both profiles have it set as of 2026-08-03.
+    //
+    // The handler is BACKGROUNDED (trailing &). waybar runs on-click
+    // synchronously and does not repaint until it returns - so with the sleep
+    // inline, the red state never rendered even though exec was producing it.
+    //
+    // CLICK FEEDBACK: the click drops a marker in $XDG_RUNTIME_DIR and signals
+    // waybar BEFORE doing any work, so the button flips to a red 'switching'
+    // state the instant it is pressed. The marker is checked first in exec, so
+    // it wins over whatever the profile list says. After the switch it sleeps
+    // 2s (both to let the tailnet settle and to keep the feedback visible),
+    // clears the marker and signals again.
+    //
+    // The settle matters: right after `tailscale switch` the '*' marker is
+    // briefly absent from the list, which would otherwise flash as 'unknown'.
+    "custom/tailscale": {
+        "return-type": "json",
+        "exec": "if [ -e \"$XDG_RUNTIME_DIR/waybar-tailscale-switching\" ]; then printf '%s\\n' '{\"text\":\"\\uf021 \\u2026\",\"class\":\"switching\",\"tooltip\":\"switching tailnet\\u2026\"}'; else a=$(tailscale switch --list 2>/dev/null | awk 'NR>1 && $NF ~ /\\*$/ {print substr($NF,1,length($NF)-1)}'); t=$(tailscale switch --list 2>/dev/null | awk 'NR>1 && $NF ~ /\\*$/ {print $2}'); if [ -z \"$a\" ]; then printf '%s\\n' '{\"text\":\"\\uf0ac ?\",\"class\":\"unknown\",\"tooltip\":\"tailscale: no active profile\"}'; elif [ \"$a\" = home ]; then printf '{\"text\":\"\\uf0ac home\",\"class\":\"home\",\"tooltip\":\"tailnet: %s (home) \\u2014 click to switch to rudder\"}\\n' \"$t\"; else printf '{\"text\":\"\\uf1ad %s\",\"class\":\"work\",\"tooltip\":\"tailnet: %s (%s) \\u2014 click to switch to home\"}\\n' \"$a\" \"$t\" \"$a\"; fi; fi",
+        "interval": 10,
+        "signal": 9,
+        "on-click": "{ touch \"$XDG_RUNTIME_DIR/waybar-tailscale-switching\"; pkill -RTMIN+9 waybar; o=$(tailscale switch --list 2>/dev/null | awk 'NR>1 && $NF !~ /\\*$/ && NF>0 {print $NF; exit}'); [ -n \"$o\" ] && tailscale switch \"$o\" >/dev/null 2>&1; sleep 2; rm -f \"$XDG_RUNTIME_DIR/waybar-tailscale-switching\"; pkill -RTMIN+9 waybar; } >/dev/null 2>&1 &",
+        "tooltip": true
+    },
     // AirPods connect/disconnect toggle.
     //
-    // Turning them OFF needs all THREE actions - block alone is not enough:
-    //   untrust     a trusted device is auto-authorized and reconnects itself
-    //   block       stops NEW connections
-    //   disconnect  block does NOT tear down an EXISTING link, and the AirPods
-    //               reconnect a second or two after a phone handover
+    // Plain connect/disconnect toggle.
     //
-    // Autoconnect is disabled by BLOCKING the device in bluez (it stays
-    // paired), so this button unblocks+connects, or disconnects+blocks again.
+    // Unsolicited reconnects were NOT a bluez problem: blueman-applet had this
+    // device in org.blueman.plugins.autoconnect and was calling
+    // Device1.Connect() on a timer, above the bluez layer. Proved with btmon
+    // ('< HCI Command: Create Connection' - we were the initiator) and D-Bus
+    // tracing back to pid 2237. Clearing that gsettings key fixed it, so no
+    // block/trust/connectable juggling is needed here.
+    //
+    // The logic now lives in ~/.local/bin/airpods rather than inline shell,
+    // because it is no longer a one-liner: BlueZ reports "Connected: yes"
+    // seconds to minutes before the A2DP sink exists, and connecting has to
+    // wait for that sink and then explicitly claim the default + any streams
+    // still on the laptop speakers. See that file for the full why.
+    //
     // exec reports state every 5s; the click also sends RTMIN+8 so the icon
-    // updates immediately instead of waiting for the next poll.
+    // updates immediately instead of waiting for the next poll. The script
+    // signals again when the sink actually lands, which is what flips the
+    // button from "pending" to "connected".
     //
-    // No script file needed - exec and on-click take inline shell.
+    // on-click backgrounds the toggle: connect blocks until the sink appears
+    // (up to 45s) and waybar serialises click handlers, so running it in the
+    // foreground would freeze the whole bar for the duration.
     "custom/airpods": {
         "return-type": "json",
-        "exec": "bluetoothctl info BC:80:4E:C0:DF:C7 2>/dev/null | grep -q 'Connected: yes' && printf '%s\\n' '{\"text\":\"\\uf025\",\"class\":\"connected\",\"tooltip\":\"AirPods connected \\u2014 click to disconnect\"}' || printf '%s\\n' '{\"text\":\"\\uf025\",\"class\":\"disconnected\",\"tooltip\":\"AirPods blocked \\u2014 click to connect\"}'",
+        "exec": "$HOME/.local/bin/airpods status",
         "interval": 5,
         "signal": 8,
-        "on-click": "if bluetoothctl info BC:80:4E:C0:DF:C7 2>/dev/null | grep -q 'Connected: yes'; then bluetoothctl untrust BC:80:4E:C0:DF:C7; bluetoothctl block BC:80:4E:C0:DF:C7; bluetoothctl disconnect BC:80:4E:C0:DF:C7; else bluetoothctl unblock BC:80:4E:C0:DF:C7 && bluetoothctl connect BC:80:4E:C0:DF:C7; fi; pkill -RTMIN+8 waybar",
+        "on-click": "$HOME/.local/bin/airpods toggle >/dev/null 2>&1 &",
+        "tooltip": true
+    },
+    // Blue light filter toggle (wlsunset).
+    //
+    // Icon reflects state: moon while the filter is running, sun while it is
+    // off. Both the schedule and the start/stop/status logic live in
+    // ~/.local/bin/bluelight - see that file for why this one is not inline
+    // shell like the modules above it.
+    //
+    // The click handler signals waybar itself (RTMIN+10), so the icon flips
+    // immediately instead of waiting out the 30s poll. The poll is still here
+    // to catch the daemon dying or being started from a terminal.
+    "custom/bluelight": {
+        "return-type": "json",
+        "exec": "$HOME/.local/bin/bluelight status",
+        "interval": 30,
+        "signal": 10,
+        "on-click": "$HOME/.local/bin/bluelight toggle",
         "tooltip": true
     },
     // Screenshot button.
@@ -59,9 +125,11 @@
     // subcommand, and here the click supplies one.
     //
     // No script file needed: on-click takes a shell command directly.
-    //   left click  -> save to ~/Pictures (XDG_PICTURES_DIR)
-    //   right click -> copy to clipboard instead of saving
-    //   middle click-> save AND copy
+    //   left click  -> savecopy: file in ~/Pictures AND on the clipboard
+    //                  (the common case - paste straight into chat, and still
+    //                   have the file afterwards)
+    //   right click -> copy: clipboard only, no file
+    //   middle click-> save: file only, no clipboard
     // --notify raises a desktop notification naming the saved file.
     // NOTE: the icon is written as a JSON \u escape rather than a literal
     // glyph. U+F030 is in the Unicode Private Use Area (Font Awesome 6 Free
@@ -71,10 +139,10 @@
     "custom/screenshot": {
         "format": "\uf030",
         "tooltip": true,
-        "tooltip-format": "Screenshot\nclick: save · right: copy · middle: both",
-        "on-click": "grimshot --notify save anything",
+        "tooltip-format": "Screenshot\nclick: save + clipboard \u00b7 right: clipboard only \u00b7 middle: file only",
+        "on-click": "grimshot --notify savecopy anything",
         "on-click-right": "grimshot --notify copy anything",
-        "on-click-middle": "grimshot --notify savecopy anything"
+        "on-click-middle": "grimshot --notify save anything"
     },
     // Modules configuration
     // "sway/workspaces": {
@@ -153,10 +221,19 @@
         //   "TelegramDesktop": "$HOME/.local/share/icons/hicolor/16x16/apps/telegram.png"
         // }
     },
+    // Clock.
+    //
+    // Date AND time are always on the bar. Waybar's default "format" is time
+    // only ({:%H:%M}) and the stock config put the date behind "format-alt",
+    // i.e. only visible while toggled by a click - so the date was normally
+    // absent. Both formats now carry the date; the alt one just adds seconds
+    // and the week number, so no click can leave the date hidden.
     "clock": {
         // "timezone": "America/New_York",
+        "format": "{:%a %Y-%m-%d %H:%M}",
+        "format-alt": "{:%a %Y-%m-%d %H:%M:%S (W%V)}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-        "format-alt": "{:%Y-%m-%d}"
+        "interval": 1
     },
     "cpu": {
         "format": "{usage}% ",

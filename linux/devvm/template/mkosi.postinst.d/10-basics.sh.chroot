@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+# Compile the host's Ghostty entry into the local terminfo database, which
+# takes precedence over packaged entries without overwriting package files.
+terminfo=/usr/lib/devvm/xterm-ghostty.terminfo
+if [ -f "$terminfo" ]; then
+    mkdir -p /etc/terminfo
+    tic -x -o /etc/terminfo - < "$terminfo"
+    rm -f "$terminfo"
+fi
+
+# dnf5-plugin-automatic installs /etc/dnf/automatic.conf with apply_updates=no
+# (notify/download only). For a guaranteed daily dnf upgrade, override it here.
+cat > /etc/dnf/automatic.conf <<'EOF'
+[commands]
+apply_updates = yes
+EOF
+
+if [ -f /etc/ssh/ssh_host_ed25519_key ]; then
+    chmod 600 /etc/ssh/ssh_host_ed25519_key
+    chmod 644 /etc/ssh/ssh_host_ed25519_key.pub
+    chown root:root /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key.pub
+fi

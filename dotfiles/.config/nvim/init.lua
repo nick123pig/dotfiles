@@ -17,7 +17,7 @@ vim.g.maplocalleader = ","
 --------------------------------------------------------------------------------
 -- Nerd Font
 --------------------------------------------------------------------------------
--- Fedora Sway Atomic ships no Nerd Font, and Ghostty here uses the default
+-- Fedora Sway Atomic ships no Nerd Font, and kitty here uses the default
 -- font, so the private-use codepoints that file-type icons live in would render
 -- as tofu boxes. False makes nvim-tree fall back to ASCII markers, which is
 -- ugly but legible. To flip this on:
@@ -26,7 +26,7 @@ vim.g.maplocalleader = ","
 --   curl -fLO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
 --   unzip -o JetBrainsMono.zip && rm JetBrainsMono.zip && fc-cache -f
 --
--- then set `font-family = JetBrainsMono Nerd Font` in ~/.config/ghostty/config
+-- then set `font_family = JetBrainsMono Nerd Font` in ~/.config/kitty/kitty.conf
 -- and set this to true. A user-local install needs no rpm-ostree layering and
 -- no reboot, which is the whole reason to prefer it on an atomic system.
 vim.g.have_nerd_font = false
@@ -62,7 +62,7 @@ opt.tabstop = 4
 opt.smartindent = true
 
 opt.mouse = "a"
-opt.termguicolors = true -- Ghostty is truecolor; without this nvim quantises
+opt.termguicolors = true -- kitty is truecolor; without this nvim quantises
                          -- every highlight down to the 256-colour cube
 opt.undofile = true      -- persistent undo in ~/.local/state/nvim/undo, which
                          -- is the reason the swap/backup files below are safe

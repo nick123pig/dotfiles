@@ -1,0 +1,28 @@
+# Generated VM data includes host keys, identities, disk images and caches.
+/target/
+/.devvm.lock
+/state.conf
+
+# mkosi caches and outputs, including builds made directly from template/.
+.cache/
+.build/
+out/
+*.raw
+*.qcow2
+
+# Defense in depth for secrets accidentally placed outside target/.
+secrets/
+*.key
+*.pem
+ssh_host_*_key
+id_rsa
+id_ed25519
+id_ecdsa
+
+# Python caches.
+__pycache__/
+*.py[cod]
+
+# Editor and OS files.
+*~
+.DS_Store

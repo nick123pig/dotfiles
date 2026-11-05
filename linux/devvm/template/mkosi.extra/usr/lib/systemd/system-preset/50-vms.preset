@@ -1,0 +1,10 @@
+# Enable the VM's core services at build time (mkosi runs
+# `systemctl preset-all` during the build; this file drives it).
+# sshd is also preset-enabled by Fedora itself — listed here to be explicit.
+enable sshd.service
+enable systemd-networkd.service
+enable systemd-resolved.service
+enable dbus.socket
+enable dbus.service
+enable dnf-automatic.timer
+enable dotfiles-sync.service

@@ -1,0 +1,11 @@
+# NVIDIA's open kernel module still uses NVIDIA's proprietary userspace,
+# so Sway requires an explicit opt-in.
+SWAY_EXTRA_ARGS="$SWAY_EXTRA_ARGS --unsupported-gpu"
+
+# NVIDIA does not expose cursor planes compatible with wlroots/Sway.
+WLR_NO_HARDWARE_CURSORS=1
+
+# Temporary workaround: wlroots 0.19.3 aborts in explicit-sync buffer release
+# (wlr_linux_drm_syncobj_v1_state_signal_release_with_buffer, n_locks > 0).
+# Re-test without this after upgrading Sway/wlroots; implicit sync may flicker.
+WLR_RENDER_NO_EXPLICIT_SYNC=1

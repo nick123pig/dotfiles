@@ -1,0 +1,159 @@
+#!/bin/sh
+# AirPods connect/disconnect, shared by the waybar button and the shell.
+#
+# Why this is a script now and not the inline `bluetoothctl connect` the waybar
+# config used to run:
+#
+# BlueZ reports `Connected: yes` as soon as the ACL link and the control
+# profiles are up, which is well before the A2DP audio transport exists. In
+# this machine's journal the gap between "Connected: yes" and the transport fd
+# going ready has run from 4 seconds to over two minutes:
+#
+#   Sep 01 14:26:54  Connected: yes        Sep 01 14:26:58  fd(41) ready    4s
+#   Sep 01 08:19:13  Connected: yes        Sep 01 08:19:30  fd(41) ready   17s
+#   Aug 31 09:37:11  Connected: yes        Aug 31 09:39:00  fd(41) ready  109s
+#
+# The old button flipped its icon green on that first signal, so it claimed
+# success during a window in which nothing routes audio for you:
+#
+#   * The bluez_output sink does not exist yet, so WirePlumber cannot pick it
+#     as the default. Its a2dp-sink priority.session is 1010 against the
+#     built-in speakers' 1000 - it only wins once it is actually there.
+#   * Any stream that starts playing inside that window links to the speakers,
+#     and node.stream.restore-target then PINS it there in
+#     ~/.local/state/wireplumber/stream-properties. A pinned stream is no
+#     longer "following the default", so linking.follow-default-target will not
+#     move it when the AirPods finally show up. It stays on the speakers until
+#     the stream is torn down and recreated - which is the only thing the
+#     disconnect/reconnect dance was ever accomplishing.
+#
+# So this waits for the sink to exist and then ASSERTS the routing rather than
+# hoping for it: sets the default sink, and drags any stream still parked on a
+# local sound card across. Streams deliberately pointed at a raop_sink (the
+# AirPlay speakers on the network) are left where they are.
+#
+# Note: despite what the waybar comment used to claim, nothing here blocks or
+# unblocks the device. Unsolicited reconnects were blueman-applet calling
+# Device1.Connect() on a timer, and clearing its autoconnect gsettings key
+# fixed that at the source - so a plain connect/disconnect is enough.
+MAC=BC:80:4E:C0:DF:C7
+
+# node.name prefix for the AirPods sink. The trailing component is the profile's
+# device index, which differs between a2dp-sink and the headset profile that
+# bluetooth.autoswitch-to-headset-profile can drop us into, so match the prefix
+# rather than pinning the whole name.
+SINK_PREFIX=bluez_output.BC_80_4E_C0_DF_C7.
+
+# Must match "signal" on custom/airpods in the waybar config. 8 is AirPods,
+# 9 is tailscale, 10 is bluelight.
+SIGNAL=8
+
+# Seconds to wait for the audio sink after BlueZ says connected. Generous
+# because the observed tail is long; we poll, so a fast connect still returns
+# as soon as the sink is there.
+TIMEOUT=45
+
+connected() {
+    bluetoothctl info "$MAC" 2>/dev/null | grep -q 'Connected: yes'
+}
+
+# Name of the AirPods sink, empty while PipeWire has not created it yet. This
+# is the signal the old button should have been waiting on.
+sink_name() {
+    pactl list short sinks 2>/dev/null | cut -f2 | grep -m1 -F "$SINK_PREFIX"
+}
+
+repaint() {
+    pkill -RTMIN+$SIGNAL waybar
+}
+
+# Move every stream still sitting on a local sound card onto $1. Anything on a
+# raop_sink was put there deliberately, so it is deliberately skipped.
+capture_streams() {
+    target=$1
+    local_sinks=$(pactl list short sinks | awk -F'\t' '$2 ~ /^alsa_output\./ {print $1}')
+    pactl list short sink-inputs 2>/dev/null | cut -f1,2 | while IFS='	' read -r input sink; do
+        for s in $local_sinks; do
+            [ "$sink" = "$s" ] && pactl move-sink-input "$input" "$target" >/dev/null 2>&1
+        done
+    done
+}
+
+do_connect() {
+    connected || bluetoothctl connect "$MAC" >/dev/null 2>&1
+
+    # Repaint straight away so the button shows the "waiting for audio" state
+    # for the duration rather than lying about being ready.
+    repaint
+
+    # Poll rather than sleep a fixed amount - see the timing table above.
+    sink=
+    i=0
+    while [ "$i" -lt $((TIMEOUT * 2)) ]; do
+        sink=$(sink_name)
+        [ -n "$sink" ] && break
+        i=$((i + 1))
+        sleep 0.5
+    done
+
+    if [ -z "$sink" ]; then
+        repaint
+        return 1
+    fi
+
+    pactl set-default-sink "$sink" >/dev/null 2>&1
+    capture_streams "$sink"
+    repaint
+}
+
+do_disconnect() {
+    bluetoothctl disconnect "$MAC" >/dev/null 2>&1
+    # No stream shepherding on the way out: when the bluez node disappears
+    # WirePlumber moves everything to the next-highest-priority sink on its
+    # own, and that fallback has never been the broken direction.
+    repaint
+}
+
+case "${1:-toggle}" in
+    connect)
+        do_connect
+        ;;
+    disconnect)
+        do_disconnect
+        ;;
+    toggle)
+        if connected; then
+            do_disconnect
+        else
+            do_connect
+        fi
+        ;;
+    # Re-assert routing without touching the bluetooth link. For when the
+    # AirPods are up but something has wandered back to the speakers.
+    fix)
+        sink=$(sink_name)
+        [ -n "$sink" ] || exit 1
+        pactl set-default-sink "$sink" >/dev/null 2>&1
+        capture_streams "$sink"
+        repaint
+        ;;
+    # waybar's "exec". Three states, not two: "connected" now means audio is
+    # actually landing on the AirPods, and "pending" covers the gap that this
+    # whole script exists because of.
+    status)
+        if connected; then
+            sink=$(sink_name)
+            if [ -n "$sink" ] && [ "$(pactl get-default-sink 2>/dev/null)" = "$sink" ]; then
+                printf '%s\n' '{"text":"","class":"connected","tooltip":"AirPods connected — click to disconnect"}'
+            else
+                printf '%s\n' '{"text":"","class":"pending","tooltip":"AirPods linked, waiting for audio — click to disconnect"}'
+            fi
+        else
+            printf '%s\n' '{"text":"","class":"disconnected","tooltip":"AirPods disconnected — click to connect"}'
+        fi
+        ;;
+    *)
+        echo "usage: airpods [toggle|connect|disconnect|fix|status]" >&2
+        exit 2
+        ;;
+esac

@@ -1,18 +1,17 @@
-# OS Specific
-if [[ $(uname) == "Darwin" ]]; then
-  # Load homebrew
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-  # Load bash completion
-  [ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
-fi
+# Interactive setup belongs here for both login and non-login shells.
+[[ $- == *i* ]] || return
 
-# local bin
-if [ -d "$HOME/.bin" ]; then
-  PATH="$HOME/.bin:$PATH"
-fi
-
-if [ -d "$HOME/.local/bin" ]; then
-  PATH="$HOME/.local/bin:$PATH"
+# Load bash completion once.
+if [[ -z ${BASH_COMPLETION_VERSINFO+x} ]]; then
+  if [[ $(uname) == "Darwin" ]]; then
+    if command -v brew >/dev/null 2>&1; then
+      completion_file="$(brew --prefix)/etc/bash_completion"
+      [ -r "$completion_file" ] && . "$completion_file"
+      unset completion_file
+    fi
+  else
+    [ -r /etc/profile.d/bash_completion.sh ] && . /etc/profile.d/bash_completion.sh
+  fi
 fi
 
 # Load zoxide
@@ -23,23 +22,17 @@ fi
 bind '"\e[A": history-search-backward'
 bind '"\e[B": history-search-forward'
 
-source $HOME/.shell/aliases.sh
+source "$HOME/.shell/aliases.sh"
 
 export PS1='[\h] $? \$ '
-
-# GPG
-GPG_TTY=$(tty)
-export GPG_TTY
 
 # external bash history
 export HISTFILESIZE=
 export HISTSIZE=
 export HISTTIMEFORMAT="[%F %T] "
 export HISTFILE=~/.bash_eternal_history
+export HISTCONTROL=ignorespace
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 
-# Random
-export DO_NOT_TRACK=1
-
-
-[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
+# Agent sockets, pinentry TTY, utilities, and interactive tool setup.
+source "$HOME/.shell/interactive.sh"
