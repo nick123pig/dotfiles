@@ -19,8 +19,12 @@ if [ -x "$(command -v zoxide)" ]; then
   eval "$(zoxide init bash)"
 fi
 
-bind '"\e[A": history-search-backward'
-bind '"\e[B": history-search-forward'
+set -o vi
+
+if [[ -o emacs || -o vi ]]; then
+  bind '"\e[A": history-search-backward'
+  bind '"\e[B": history-search-forward'
+fi
 
 source "$HOME/.shell/aliases.sh"
 
